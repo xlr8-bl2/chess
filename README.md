@@ -8,7 +8,7 @@ A browser chess game. Play against the computer, **switch sides at any point** (
 - Choose **You** or **Computer** for each side: play both sides yourself, or let the computer take one (or both)
 - **Computer move** button: the computer plays one move for the side to move, only when you ask
 - **Switch sides** mid-game swaps who plays White and Black
-- **Set up any position**: drag pieces from a palette, move or remove them, pick the side to move and castling rights, or paste a FEN, then press Start game
+- **Edit the board at any time**, even mid-game: drag pieces from a palette, move or remove them, pick the side to move and castling rights, or paste a FEN. Then press **Continue game** to carry on with the move list kept (Undo can step back past the edit), or **Start new game** to begin fresh from that position
 - **8 difficulty levels**: Beginner, Novice, Casual, Club player, Advanced, Expert, Master, Grandmaster. Changing the level while the computer is thinking restarts its search at the new strength
 - Undo (takes back to your last move), hint, flip board, move list, captured pieces
 - Remembers your last side and difficulty

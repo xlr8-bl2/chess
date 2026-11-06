@@ -83,7 +83,7 @@
           <button class="icon-btn" id="undoBtn" title="Undo">↶<span>Undo</span></button>
           <button class="icon-btn" id="hintBtn" title="Hint">💡<span>Hint</span></button>
           <button class="icon-btn" id="flipBtn" title="Flip board">⇅<span>Flip</span></button>
-          <button class="icon-btn" id="editBtn" title="Set up a position">✎<span>Set up</span></button>
+          <button class="icon-btn" id="editBtn" title="Edit the pieces on the board">✎<span>Edit board</span></button>
         </div>
 
         <button class="btn big primary" id="newBtn">New game</button>
@@ -95,7 +95,7 @@
     <aside class="panel" id="editPanel" hidden>
       <header class="panel-head">
         <img src="pieces/wQ.svg" alt="" class="head-icon">
-        <h1>Set up position</h1>
+        <h1>Edit board</h1>
       </header>
 
       <div class="panel-body">
@@ -143,8 +143,9 @@
 
         <div class="two">
           <button class="btn" id="cancelEditBtn">Cancel</button>
-          <button class="btn big primary" id="startGameBtn">Start game</button>
+          <button class="btn" id="startGameBtn" title="Clear the move list and start a fresh game from this position">Start new game</button>
         </div>
+        <button class="btn big primary" id="continueBtn" title="Keep the moves so far and carry on from this position">Continue game</button>
       </div>
     </aside>
   </main>

@@ -250,7 +250,10 @@ input[type="range"] { width: 100%; accent-color: var(--green); }
 .moves .n { color: var(--muted); }
 .moves .m { padding: 2px 6px; border-radius: 3px; color: var(--text-2); justify-self: start; }
 .moves .m.cur { background: var(--raised-hi); color: var(--text); border-bottom: 2px solid #5a5856; }
-.moves .empty { color: var(--muted); font-weight: 400; padding: 8px 10px; display: block; }
+.moves li.note {
+  display: block; text-align: center; color: var(--muted); font-size: 12px; font-weight: 600;
+  padding: 4px 8px; background: transparent;
+}
 
 .toolbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .icon-btn {

@@ -119,6 +119,9 @@
   // ---------------------------------------------------------------- State
   let startFen = START_FEN;
   let pos, uciMoves, sanMoves, capturedBy;
+  // Earlier stretches of this game, before the position was edited mid-game: [{ fen, sans }]
+  let pastSegments = [];
+  let baseCaptured = [[], []];
   // isComputer[color]: whether the computer plays that color automatically.
   let isComputer = store.get('isComputer', [false, false]);
   if (!Array.isArray(isComputer) || isComputer.length !== 2) isComputer = [false, false];
@@ -157,12 +160,19 @@
   levelRange.max = LEVELS.length - 1;
 
   // ---------------------------------------------------------------- Game control
-  function startGame(fen) {
+  function startGame(fen, keepHistory) {
     cancelSearch();
+    if (keepHistory) {
+      pastSegments.push({ fen: startFen, sans: sanMoves.slice(), ucis: uciMoves.slice(), base: baseCaptured });
+      baseCaptured = capturedBy.map((l) => l.slice());
+    } else {
+      pastSegments = [];
+      baseCaptured = [[], []];
+    }
     startFen = fen;
     pos = new Position(fen);
     uciMoves = []; sanMoves = [];
-    capturedBy = [[], []];
+    capturedBy = baseCaptured.map((l) => l.slice());
     selected = -1; legalFromSelected = []; hintMove = 0;
     gameStatus = pos.status();
     if (stockfish) stockfish.newGame();
@@ -240,9 +250,28 @@
 
   const switchSides = () => setPlayers([isComputer[BLACK], isComputer[WHITE]]);
 
+  // Undo the most recent mid-game edit: go back to the game as it was just before it.
+  function undoEdit() {
+    const seg = pastSegments.pop();
+    startFen = seg.fen;
+    baseCaptured = seg.base;
+    pos = new Position(seg.fen);
+    for (const u of seg.ucis) pos.make(pos.fromUci(u));
+    uciMoves = seg.ucis.slice();
+    sanMoves = seg.sans.slice();
+  }
+
   function undo() {
     cancelSearch();
-    if (!uciMoves.length) return;
+    if (!uciMoves.length) {
+      if (!pastSegments.length) return;
+      undoEdit();
+      rebuildCaptures();
+      selected = -1; legalFromSelected = []; hintMove = 0;
+      gameStatus = pos.status();
+      render();
+      return;
+    }
     const popOne = () => { pos.unmake(); uciMoves.pop(); sanMoves.pop(); };
     popOne();
     // Against the computer, take back to a position where it's your move.
@@ -256,7 +285,7 @@
 
   function rebuildCaptures() {
     const p = new Position(startFen);
-    capturedBy = [[], []];
+    capturedBy = baseCaptured.map((l) => l.slice());
     for (const u of uciMoves) {
       const m = p.fromUci(u);
       const victim = victimOf(p, m);
@@ -295,7 +324,7 @@
     hintToken++;
     editing = true;
     const p = new Position(pos.fen());
-    edit = { board: Int8Array.from(p.board), turn: p.turn, castling: p.castling };
+    edit = { board: Int8Array.from(p.board), turn: p.turn, castling: p.castling, fullmove: p.fullmove };
     tool = 'move';
     selected = -1; legalFromSelected = []; hintMove = 0;
     $('playPanel').hidden = true;
@@ -325,7 +354,7 @@
     p.board.set(edit.board);
     p.turn = edit.turn;
     p.castling = edit.castling & castlingPossible(edit.board);
-    p.ep = -1; p.halfmove = 0; p.fullmove = 1;
+    p.ep = -1; p.halfmove = 0; p.fullmove = edit.fullmove || 1;
     return p.fen();
   }
 
@@ -398,8 +427,9 @@
     const err = validateEdit();
     const st = $('editStatus');
     st.classList.toggle('error', !!err);
-    st.textContent = err || 'Position is ready. Press Start game.';
+    st.textContent = err || 'Position is ready. Continue the game or start a new one from here.';
     $('startGameBtn').disabled = !!err;
+    $('continueBtn').disabled = !!err;
   }
 
   // ---------------------------------------------------------------- Input (play mode)
@@ -674,35 +704,40 @@
     }
     statusEl.textContent = s;
 
-    // Move list (handles games that start with Black to move)
+    // Move list: earlier segments (before mid-game edits), then the current one.
     const movesEl = $('moves');
     movesEl.replaceChildren();
-    const start = new Position(startFen);
-    const offset = start.turn === BLACK ? 1 : 0;
-    const total = sanMoves.length + offset;
-    if (!sanMoves.length) {
-      const li = document.createElement('li');
-      li.innerHTML = '<span class="empty">No moves yet</span>';
-      li.style.display = 'block';
-      movesEl.appendChild(li);
-    }
-    for (let i = 0; i < total && sanMoves.length; i += 2) {
-      const li = document.createElement('li');
-      const n = document.createElement('span'); n.className = 'n'; n.textContent = (start.fullmove + i / 2) + '.';
-      li.appendChild(n);
-      for (const j of [i, i + 1]) {
-        const k = j - offset;
-        const span = document.createElement('span'); span.className = 'm';
-        span.textContent = k < 0 ? '…' : (sanMoves[k] || '');
-        if (k === sanMoves.length - 1) span.classList.add('cur');
-        li.appendChild(span);
+    const addSegment = (fen, sans, isCurrent) => {
+      const start = new Position(fen);
+      const offset = start.turn === BLACK ? 1 : 0;
+      const total = sans.length + offset;
+      for (let i = 0; i < total && sans.length; i += 2) {
+        const li = document.createElement('li');
+        const n = document.createElement('span'); n.className = 'n'; n.textContent = (start.fullmove + i / 2) + '.';
+        li.appendChild(n);
+        for (const j of [i, i + 1]) {
+          const k = j - offset;
+          const span = document.createElement('span'); span.className = 'm';
+          span.textContent = k < 0 ? '…' : (sans[k] || '');
+          if (isCurrent && k === sans.length - 1) span.classList.add('cur');
+          li.appendChild(span);
+        }
+        movesEl.appendChild(li);
       }
+    };
+    const note = (text) => {
+      const li = document.createElement('li');
+      li.className = 'note';
+      li.textContent = text;
       movesEl.appendChild(li);
-    }
+    };
+    for (const seg of pastSegments) { addSegment(seg.fen, seg.sans, false); note('Board edited'); }
+    addSegment(startFen, sanMoves, true);
+    if (!sanMoves.length && !pastSegments.length) note('No moves yet');
     const wrap = movesEl.parentElement;
     wrap.scrollTop = wrap.scrollHeight;
 
-    $('undoBtn').disabled = !uciMoves.length;
+    $('undoBtn').disabled = !uciMoves.length && !pastSegments.length;
     $('hintBtn').disabled = gameStatus.over || thinking || !humanToMove();
     $('playBtn').disabled = gameStatus.over || thinking;
     updateEngineNote();
@@ -750,7 +785,7 @@
   });
   $('startPosBtn').onclick = () => {
     const p = new Position(START_FEN);
-    edit = { board: Int8Array.from(p.board), turn: WHITE, castling: 15 };
+    edit = { board: Int8Array.from(p.board), turn: WHITE, castling: 15, fullmove: 1 };
     render();
   };
   $('clearBtn').onclick = () => { edit.board.fill(0); edit.castling = 0; render(); };
@@ -758,7 +793,7 @@
   const loadFen = () => {
     try {
       const p = new Position($('fenInput').value);
-      edit = { board: Int8Array.from(p.board), turn: p.turn, castling: p.castling };
+      edit = { board: Int8Array.from(p.board), turn: p.turn, castling: p.castling, fullmove: p.fullmove };
       $('fenInput').blur();
       render();
     } catch {
@@ -770,14 +805,16 @@
   $('fenLoadBtn').onclick = loadFen;
   $('fenInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadFen(); });
   $('cancelEditBtn').onclick = leaveEditor;
-  $('startGameBtn').onclick = () => {
+  const finishEdit = (keepHistory) => {
     if (validateEdit()) return;
     const fen = editFen();
     editing = false; edit = null;
     $('editPanel').hidden = true;
     $('playPanel').hidden = false;
-    startGame(fen);
+    startGame(fen, keepHistory);
   };
+  $('startGameBtn').onclick = () => finishEdit(false);
+  $('continueBtn').onclick = () => finishEdit(true);
 
   newGame();
 })();
