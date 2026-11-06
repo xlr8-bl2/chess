@@ -182,6 +182,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn.primary:hover:not(:disabled) { background: var(--accent-2); }
 
+.side-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.side-icon { width: 24px; height: 24px; }
+#switchBtn { white-space: nowrap; }
+.seg { display: inline-flex; background: var(--panel-2); border: 1px solid #44474f; border-radius: 8px; padding: 2px; }
+.seg button {
+  font: inherit; font-size: 14px; color: var(--muted); background: transparent;
+  border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+.seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+.seg button:focus-visible, .btn:focus-visible, select:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
 .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 .moves {

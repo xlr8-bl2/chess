@@ -54,13 +54,33 @@
   class StockfishEngine {
     constructor() {
       this.ready = false; this.failed = false; this.resolve = null; this.ignore = 0; this.busy = false;
+      this.start(() => new Worker('engine/stockfish.js'), true);
+    }
+    start(make, canRetry) {
+      let triedFallback = false;
+      const fallback = () => {
+        if (triedFallback || !canRetry || this.ready) return;
+        triedFallback = true;
+        try { this.worker && this.worker.terminate(); } catch { /* ignore */ }
+        // Some hosts block loading a worker directly; build it from the fetched source instead.
+        fetch('engine/stockfish.js')
+          .then((r) => { if (!r.ok) throw new Error('fetch failed'); return r.text(); })
+          .then((src) => {
+            const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+            this.start(() => new Worker(url), false);
+          })
+          .catch(() => { this.failed = true; updateEngineNote(); });
+      };
       try {
-        this.worker = new Worker('engine/stockfish.js');
-      } catch (e) { this.failed = true; return; }
-      this.worker.onerror = () => { this.failed = true; this.ready = false; updateEngineNote(); };
+        this.worker = make();
+      } catch (e) { if (canRetry) fallback(); else { this.failed = true; updateEngineNote(); } return; }
+      this.worker.onerror = () => { if (canRetry) fallback(); else { this.failed = true; this.ready = false; updateEngineNote(); } };
       this.worker.onmessage = (e) => this.onLine(typeof e.data === 'string' ? e.data : String(e.data));
       this.worker.postMessage('uci');
-      setTimeout(() => { if (!this.ready) { this.failed = true; updateEngineNote(); } }, 15000);
+      setTimeout(() => {
+        if (this.ready) return;
+        if (canRetry) fallback(); else { this.failed = true; updateEngineNote(); }
+      }, 20000);
     }
     onLine(line) {
       if (line === 'uciok') { this.ready = true; this.failed = false; this.worker.postMessage('isready'); updateEngineNote(); return; }
@@ -98,9 +118,11 @@
 
   // ---------------------------------------------------------------- State
   let pos, uciMoves, sanMoves, capturedBy;
-  let human = store.get('human', WHITE);
+  // isComputer[color]: whether the computer plays that color automatically.
+  let isComputer = store.get('isComputer', [false, false]);
+  if (!Array.isArray(isComputer) || isComputer.length !== 2) isComputer = [false, false];
   let level = Math.min(LEVELS.length - 1, Math.max(0, store.get('level', 2)));
-  let orientation = human;
+  let orientation = isComputer[WHITE] && !isComputer[BLACK] ? BLACK : WHITE;
   let selected = -1;
   let legalFromSelected = [];
   let thinking = false;
@@ -162,8 +184,11 @@
     if (stockfish) stockfish.cancel();
   }
 
-  function maybeComputerMove() {
-    if (gameStatus.over || pos.turn === human) return;
+  const humanToMove = () => !isComputer[pos.turn];
+
+  function maybeComputerMove(force) {
+    if (gameStatus.over || thinking) return;
+    if (!force && !isComputer[pos.turn]) return;
     const token = ++searchToken;
     thinking = true;
     render();
@@ -185,14 +210,21 @@
     });
   }
 
-  function switchSides() {
-    cancelSearch();
-    human ^= 1;
-    orientation = human;
-    store.set('human', human);
+  function setPlayers(next) {
+    const wasThinking = thinking;
+    isComputer = next;
+    store.set('isComputer', isComputer);
+    // Face the board toward the single human player, if there is exactly one.
+    if (isComputer[WHITE] !== isComputer[BLACK]) orientation = isComputer[WHITE] ? BLACK : WHITE;
+    // Stop the computer if the side it was thinking for is now yours.
+    if (wasThinking && !isComputer[pos.turn]) cancelSearch();
     selected = -1; legalFromSelected = []; hintMove = 0;
     render();
     maybeComputerMove();
+  }
+
+  function switchSides() {
+    setPlayers([isComputer[BLACK], isComputer[WHITE]]);
   }
 
   function undo() {
@@ -205,7 +237,7 @@
     };
     popOne();
     // Take back to a position where it's your move (undo the computer's reply too).
-    if (pos.turn !== human && uciMoves.length) popOne();
+    while (isComputer[pos.turn] && !isComputer[pos.turn ^ 1] && uciMoves.length) popOne();
     rebuildCaptures();
     selected = -1; legalFromSelected = []; hintMove = 0;
     gameStatus = pos.status();
@@ -232,13 +264,13 @@
     levelSel.value = level;
     levelRange.value = level;
     // If the computer is mid-think, restart with the new strength.
-    if (thinking) { cancelSearch(); maybeComputerMove(); }
+    if (thinking) { cancelSearch(); maybeComputerMove(true); }
     renderPanel();
   }
 
   let hintToken = 0;
   function hint() {
-    if (gameStatus.over || pos.turn !== human || thinking) return;
+    if (gameStatus.over || !humanToMove() || thinking) return;
     const token = ++hintToken;
     const fenMoves = uciMoves.slice();
     statusEl.textContent = 'Thinking of a hint…';
@@ -256,7 +288,7 @@
   // ---------------------------------------------------------------- Input
   function trySelect(sq) {
     const p = pos.board[sq];
-    if (p && (p >> 3) === pos.turn && pos.turn === human && !gameStatus.over && !thinking) {
+    if (p && (p >> 3) === pos.turn && humanToMove() && !gameStatus.over && !thinking) {
       selected = sq;
       legalFromSelected = pos.legalMoves().filter((m) => mFrom(m) === sq);
       return true;
@@ -417,7 +449,7 @@
 
   function renderPanel() {
     const topColor = orientation ^ 1, bottomColor = orientation;
-    const label = (c) => (c === human ? 'You' : 'Computer') + ' (' + colorName(c) + ')';
+    const label = (c) => (isComputer[c] ? 'Computer' : 'You') + ' (' + colorName(c) + ')';
     $('nameTop').textContent = label(topColor);
     $('nameBottom').textContent = label(bottomColor);
     $('nameTop').classList.toggle('thinking', thinking && pos.turn === topColor);
@@ -425,7 +457,11 @@
     renderCaptured($('capTop'), topColor);
     renderCaptured($('capBottom'), bottomColor);
 
-    $('sideLabel').textContent = colorName(human);
+    for (const [id, side, comp] of [['wHuman', 0, false], ['wComp', 0, true], ['bHuman', 1, false], ['bComp', 1, true]]) {
+      const el = $(id);
+      el.classList.toggle('on', isComputer[side] === comp);
+      el.setAttribute('aria-pressed', String(isComputer[side] === comp));
+    }
     levelSel.value = level;
     levelRange.value = level;
     const lvl = LEVELS[level];
@@ -436,12 +472,13 @@
     if (gameStatus.over) {
       if (gameStatus.reason === 'checkmate') {
         const winner = gameStatus.result === '1-0' ? WHITE : BLACK;
-        s = `Checkmate — ${colorName(winner)} wins${winner === human ? '. Well played!' : '.'}`;
+        const oneHuman = isComputer[WHITE] !== isComputer[BLACK];
+        s = `Checkmate — ${colorName(winner)} wins${oneHuman && !isComputer[winner] ? '. Well played!' : '.'}`;
       } else s = `Draw by ${gameStatus.reason}.`;
     } else if (thinking) {
       s = `Computer (${colorName(pos.turn)}) is thinking…`;
     } else {
-      s = `Your move (${colorName(pos.turn)})`;
+      s = `${colorName(pos.turn)} to move`;
       if (pos.inCheck()) s += ' — check!';
       if (hintMove) s += ` · Hint: ${pos.toSan(hintMove)}`;
     }
@@ -462,7 +499,8 @@
     movesEl.scrollTop = movesEl.scrollHeight;
 
     $('undoBtn').disabled = !uciMoves.length;
-    $('hintBtn').disabled = gameStatus.over || thinking || pos.turn !== human;
+    $('hintBtn').disabled = gameStatus.over || thinking || !humanToMove();
+    $('playBtn').disabled = gameStatus.over || thinking;
     updateEngineNote();
   }
 
@@ -470,16 +508,28 @@
     const el = $('engineNote');
     if (!el || !pos) return;
     const lvl = LEVELS[level];
+    let sfState;
+    if (sfUsable()) sfState = 'Stockfish ready';
+    else if (stockfish && !stockfish.failed) sfState = 'Stockfish loading…';
+    else sfState = 'Stockfish failed to load, so levels 5–8 use the built-in engine';
     let s;
-    if (!lvl.sf) s = 'Engine: built-in';
-    else if (sfUsable()) s = 'Engine: Stockfish';
-    else if (stockfish && !stockfish.failed) s = 'Engine: loading Stockfish… (built-in for now)';
-    else s = 'Engine: built-in (Stockfish unavailable)';
+    if (!lvl.sf) s = `This level uses the built-in engine. Levels 5–8 use Stockfish (${sfState}).`;
+    else if (sfUsable()) s = 'This level uses Stockfish.';
+    else s = `This level uses the built-in engine for now (${sfState}).`;
     el.textContent = s;
   }
 
   // ---------------------------------------------------------------- Wire up
   $('switchBtn').onclick = switchSides;
+  $('playBtn').onclick = () => maybeComputerMove(true);
+  for (const id of ['wHuman', 'wComp', 'bHuman', 'bComp']) {
+    const el = $(id);
+    el.onclick = () => {
+      const next = isComputer.slice();
+      next[+el.dataset.side] = el.dataset.who === 'computer';
+      setPlayers(next);
+    };
+  }
   $('newBtn').onclick = newGame;
   $('undoBtn').onclick = undo;
   $('flipBtn').onclick = () => { orientation ^= 1; render(); };

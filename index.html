@@ -34,9 +34,24 @@
       <div class="status" id="status" role="status" aria-live="polite"></div>
 
       <div class="group">
-        <div class="row between">
-          <span>You play <strong id="sideLabel">White</strong></span>
-          <button class="btn primary" id="switchBtn" title="Swap sides — the computer takes over the color you leave">⇄ Switch sides</button>
+        <div class="label">Who plays each side</div>
+        <div class="side-row">
+          <span class="side-name"><img class="side-icon" src="pieces/wK.svg" alt="">White</span>
+          <div class="seg" role="group" aria-label="White player">
+            <button id="wHuman" data-side="0" data-who="human">You</button>
+            <button id="wComp" data-side="0" data-who="computer">Computer</button>
+          </div>
+        </div>
+        <div class="side-row">
+          <span class="side-name"><img class="side-icon" src="pieces/bK.svg" alt="">Black</span>
+          <div class="seg" role="group" aria-label="Black player">
+            <button id="bHuman" data-side="1" data-who="human">You</button>
+            <button id="bComp" data-side="1" data-who="computer">Computer</button>
+          </div>
+        </div>
+        <div class="buttons">
+          <button class="btn" id="switchBtn" title="Swap who plays White and who plays Black">⇄ Switch sides</button>
+          <button class="btn primary" id="playBtn" title="Let the computer play one move for the side to move">Computer move</button>
         </div>
       </div>
 
