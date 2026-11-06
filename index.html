@@ -4,17 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Chess Simulator</title>
-  <meta name="description" content="Play chess against the computer, switch sides at any time, and pick a difficulty from Beginner to Grandmaster.">
-  <meta name="theme-color" content="#1e1f24">
+  <meta name="description" content="Play chess against the computer, set up any position, switch sides at any time, and pick a difficulty from Beginner to Grandmaster.">
+  <meta name="theme-color" content="#302e2b">
   <link rel="icon" href="pieces/wN.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="app">
     <section class="board-area">
-      <div class="player-bar top" id="barTop">
-        <span class="who" id="nameTop"></span>
-        <span class="captured" id="capTop"></span>
+      <div class="player-bar" id="barTop">
+        <div class="avatar" id="avTop"></div>
+        <div class="pinfo">
+          <span class="who" id="nameTop"></span>
+          <span class="captured" id="capTop"></span>
+        </div>
       </div>
       <div class="board-wrap">
         <div class="board" id="board" aria-label="Chess board"></div>
@@ -22,59 +25,127 @@
           <div class="promo-box" id="promoBox"></div>
         </div>
       </div>
-      <div class="player-bar bottom" id="barBottom">
-        <span class="who" id="nameBottom"></span>
-        <span class="captured" id="capBottom"></span>
+      <div class="player-bar" id="barBottom">
+        <div class="avatar" id="avBottom"></div>
+        <div class="pinfo">
+          <span class="who" id="nameBottom"></span>
+          <span class="captured" id="capBottom"></span>
+        </div>
       </div>
     </section>
 
-    <aside class="panel">
-      <h1>Chess Simulator</h1>
+    <!-- Play panel -->
+    <aside class="panel" id="playPanel">
+      <header class="panel-head">
+        <img src="pieces/wN.svg" alt="" class="head-icon">
+        <h1>Play</h1>
+      </header>
 
-      <div class="status" id="status" role="status" aria-live="polite"></div>
+      <div class="panel-body">
+        <div class="status" id="status" role="status" aria-live="polite"></div>
 
-      <div class="group">
-        <div class="label">Who plays each side</div>
-        <div class="side-row">
-          <span class="side-name"><img class="side-icon" src="pieces/wK.svg" alt="">White</span>
-          <div class="seg" role="group" aria-label="White player">
-            <button id="wHuman" data-side="0" data-who="human">You</button>
-            <button id="wComp" data-side="0" data-who="computer">Computer</button>
+        <div class="section">
+          <div class="label">Who plays each side</div>
+          <div class="side-row">
+            <span class="side-name"><img class="side-icon" src="pieces/wK.svg" alt="">White</span>
+            <div class="seg" role="group" aria-label="White player">
+              <button id="wHuman" data-side="0" data-who="human">You</button>
+              <button id="wComp" data-side="0" data-who="computer">Computer</button>
+            </div>
+          </div>
+          <div class="side-row">
+            <span class="side-name"><img class="side-icon" src="pieces/bK.svg" alt="">Black</span>
+            <div class="seg" role="group" aria-label="Black player">
+              <button id="bHuman" data-side="1" data-who="human">You</button>
+              <button id="bComp" data-side="1" data-who="computer">Computer</button>
+            </div>
+          </div>
+          <div class="two">
+            <button class="btn" id="switchBtn" title="Swap who plays White and who plays Black">⇄ Switch sides</button>
+            <button class="btn" id="playBtn" title="Let the computer play one move for the side to move">Computer move</button>
           </div>
         </div>
-        <div class="side-row">
-          <span class="side-name"><img class="side-icon" src="pieces/bK.svg" alt="">Black</span>
-          <div class="seg" role="group" aria-label="Black player">
-            <button id="bHuman" data-side="1" data-who="human">You</button>
-            <button id="bComp" data-side="1" data-who="computer">Computer</button>
+
+        <div class="section">
+          <label for="level" class="label">Computer difficulty</label>
+          <select id="level"></select>
+          <input type="range" id="levelRange" min="0" max="7" step="1" aria-label="Difficulty">
+          <div class="hint" id="levelInfo"></div>
+        </div>
+
+        <div class="section grow">
+          <div class="moves-wrap">
+            <ol class="moves" id="moves"></ol>
           </div>
         </div>
-        <div class="buttons">
-          <button class="btn" id="switchBtn" title="Swap who plays White and who plays Black">⇄ Switch sides</button>
-          <button class="btn primary" id="playBtn" title="Let the computer play one move for the side to move">Computer move</button>
+
+        <div class="toolbar">
+          <button class="icon-btn" id="undoBtn" title="Undo">↶<span>Undo</span></button>
+          <button class="icon-btn" id="hintBtn" title="Hint">💡<span>Hint</span></button>
+          <button class="icon-btn" id="flipBtn" title="Flip board">⇅<span>Flip</span></button>
+          <button class="icon-btn" id="editBtn" title="Set up a position">✎<span>Set up</span></button>
+        </div>
+
+        <button class="btn big primary" id="newBtn">New game</button>
+        <div class="engine-note" id="engineNote"></div>
+      </div>
+    </aside>
+
+    <!-- Position editor panel -->
+    <aside class="panel" id="editPanel" hidden>
+      <header class="panel-head">
+        <img src="pieces/wQ.svg" alt="" class="head-icon">
+        <h1>Set up position</h1>
+      </header>
+
+      <div class="panel-body">
+        <div class="status" id="editStatus" role="status" aria-live="polite"></div>
+
+        <div class="section">
+          <div class="label">Pieces</div>
+          <div class="palette" id="palette"></div>
+          <div class="hint">Drag pieces onto the board, or pick one and tap squares. Drag a piece off the board to remove it. Right-click also removes.</div>
+        </div>
+
+        <div class="section">
+          <div class="label">Side to move</div>
+          <div class="seg full" role="group" aria-label="Side to move">
+            <button id="turnW">White to move</button>
+            <button id="turnB">Black to move</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="label">Castling</div>
+          <div class="castle-grid">
+            <label><input type="checkbox" id="cK"> White O-O</label>
+            <label><input type="checkbox" id="cQ"> White O-O-O</label>
+            <label><input type="checkbox" id="ck"> Black O-O</label>
+            <label><input type="checkbox" id="cq"> Black O-O-O</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="two">
+            <button class="btn" id="startPosBtn">Starting position</button>
+            <button class="btn" id="clearBtn">Clear board</button>
+          </div>
+          <button class="btn" id="editFlipBtn">⇅ Flip board</button>
+        </div>
+
+        <div class="section">
+          <label for="fenInput" class="label">FEN</label>
+          <div class="fen-row">
+            <input id="fenInput" type="text" spellcheck="false" autocomplete="off">
+            <button class="btn" id="fenLoadBtn">Load</button>
+          </div>
+        </div>
+
+        <div class="two">
+          <button class="btn" id="cancelEditBtn">Cancel</button>
+          <button class="btn big primary" id="startGameBtn">Start game</button>
         </div>
       </div>
-
-      <div class="group">
-        <label for="level" class="label">Computer difficulty</label>
-        <select id="level"></select>
-        <input type="range" id="levelRange" min="0" max="7" step="1" aria-label="Difficulty">
-        <div class="hint" id="levelInfo"></div>
-      </div>
-
-      <div class="group buttons">
-        <button class="btn" id="newBtn">New game</button>
-        <button class="btn" id="undoBtn">Undo</button>
-        <button class="btn" id="flipBtn">Flip board</button>
-        <button class="btn" id="hintBtn">Hint</button>
-      </div>
-
-      <div class="group">
-        <div class="label">Moves</div>
-        <ol class="moves" id="moves"></ol>
-      </div>
-
-      <div class="engine-note" id="engineNote"></div>
     </aside>
   </main>
 

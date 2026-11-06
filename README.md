@@ -5,7 +5,10 @@ A browser chess game. Play against the computer, **switch sides at any point** (
 ## Features
 - Click-to-move or drag-and-drop, with legal-move dots, last-move and check highlights
 - Full rules: castling, en passant, promotion (with a piece picker), checkmate, stalemate, threefold repetition, fifty-move rule, insufficient material
-- **Switch sides** mid-game. If it becomes the computer's turn, it moves right away
+- Choose **You** or **Computer** for each side: play both sides yourself, or let the computer take one (or both)
+- **Computer move** button: the computer plays one move for the side to move, only when you ask
+- **Switch sides** mid-game swaps who plays White and Black
+- **Set up any position**: drag pieces from a palette, move or remove them, pick the side to move and castling rights, or paste a FEN, then press Start game
 - **8 difficulty levels**: Beginner, Novice, Casual, Club player, Advanced, Expert, Master, Grandmaster. Changing the level while the computer is thinking restarts its search at the new strength
 - Undo (takes back to your last move), hint, flip board, move list, captured pieces
 - Remembers your last side and difficulty
